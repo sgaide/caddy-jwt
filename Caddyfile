@@ -4,4 +4,5 @@ jwt /
 
 jwt {
 	path /test2
+	keys ./jsonwebkeyset.json
 }
