@@ -5,6 +5,11 @@ import (
 
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"gopkg.in/square/go-jose.v2"
+	"io"
+	"os"
+	"io/ioutil"
+	"encoding/json"
 )
 
 const (
@@ -20,6 +25,7 @@ type JWTAuth struct {
 type Rule struct {
 	Path        string
 	AccessRules []AccessRule
+	Keys	    jose.JSONWebKeySet
 }
 
 type AccessRule struct {
@@ -36,7 +42,7 @@ func init() {
 }
 
 func Setup(c *caddy.Controller) error {
-	rules, err := parse(c)
+	rules,  err := parse(c)
 	if err != nil {
 		return err
 	}
@@ -55,6 +61,23 @@ func Setup(c *caddy.Controller) error {
 
 	return nil
 }
+
+func loadKeys(path string, keys *jose.JSONWebKeySet) error {
+
+	var rdr io.Reader
+	if f, err := os.Open(path); err == nil {
+		rdr = f
+		defer f.Close()
+	} else {
+		return err
+	}
+	if data, err := ioutil.ReadAll(rdr); err == nil {
+		return json.Unmarshal(data, keys);
+	} else {
+		return err
+	}
+}
+
 
 func parse(c *caddy.Controller) ([]Rule, error) {
 	// This parses the following config blocks
@@ -102,6 +125,20 @@ func parse(c *caddy.Controller) ([]Rule, error) {
 						return nil, c.ArgErr()
 					}
 					r.AccessRules = append(r.AccessRules, AccessRule{Authorize: DENY, Claim: args1[0], Value: args1[1]})
+				case "keys":
+					if !c.NextArg() {
+						// we are expecting a value
+						return nil, c.ArgErr()
+					}
+					// return error if multiple key paths in a block
+					if len(r.Keys.Keys) != 0 {
+						return nil, c.ArgErr()
+					}
+					loadKeys( c.Val(), &r.Keys)
+					if c.NextArg() {
+						// we are expecting only one value.
+						return nil, c.ArgErr()
+					}
 				}
 			}
 			rules = append(rules, r)

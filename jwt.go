@@ -3,12 +3,13 @@ package jwt
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"gopkg.in/square/go-jose.v2"
+	"strconv"
+	"gopkg.in/square/go-jose.v2/jwt"
+	"time"
 )
 
 func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
@@ -25,11 +26,10 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 		}
 
 		// Validate token
-		vToken, err := ValidateToken(uToken)
+		claims, err := ValidateToken(uToken, &p.Keys)
 		if err != nil {
 			return http.StatusUnauthorized, nil
 		}
-		vClaims := vToken.Claims.(jwt.MapClaims)
 
 		// If token contains rules with allow or deny, evaluate
 		if len(p.AccessRules) > 0 {
@@ -37,19 +37,9 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 			for _, rule := range p.AccessRules {
 				switch rule.Authorize {
 				case ALLOW:
-					if vClaims[rule.Claim] == rule.Value {
-						isAuthorized = append(isAuthorized, true)
-					}
-					if vClaims[rule.Claim] != rule.Value {
-						isAuthorized = append(isAuthorized, false)
-					}
+					isAuthorized = append(isAuthorized, (*claims)[rule.Claim] == rule.Value)
 				case DENY:
-					if vClaims[rule.Claim] == rule.Value {
-						isAuthorized = append(isAuthorized, false)
-					}
-					if vClaims[rule.Claim] != rule.Value {
-						isAuthorized = append(isAuthorized, true)
-					}
+					isAuthorized = append(isAuthorized, (*claims)[rule.Claim] != rule.Value)
 				default:
 					return http.StatusUnauthorized, fmt.Errorf("unknown rule type")
 				}
@@ -59,6 +49,7 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 			for _, result := range isAuthorized {
 				if result {
 					ok = true
+					break
 				}
 			}
 			if !ok {
@@ -67,30 +58,18 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 		}
 
 		// set claims as separate headers for downstream to consume
-		for claim, value := range vClaims {
-			c := strings.ToUpper(claim)
-			switch value.(type) {
-			case string:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), value.(string))
-			case int64:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), strconv.FormatInt(value.(int64), 10))
-			case bool:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), strconv.FormatBool(value.(bool)))
-			case int32:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), strconv.FormatInt(int64(value.(int32)), 10))
-			case float32:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), strconv.FormatFloat(float64(value.(float32)), 'f', -1, 32))
-			case float64:
-				r.Header.Set(strings.Join([]string{"Token-Claim-", c}, ""), strconv.FormatFloat(value.(float64), 'f', -1, 64))
-			default:
-				return http.StatusUnauthorized, fmt.Errorf("unknown claim type, unable to convert to string")
-			}
+		for key, value := range *claims {
+			r.Header.Set(strings.Join([]string{"Token-Claim-", SanitizeHeaderName(key)}, ""), toString(value))
 		}
 
 		return h.Next.ServeHTTP(w, r)
 	}
 	// pass request if no paths protected with JWT
 	return h.Next.ServeHTTP(w, r)
+}
+
+func SanitizeHeaderName(name string) string {
+	return strings.Replace(name, ":", "-", -1)
 }
 
 // ExtractToken will find a JWT token passed one of three ways: (1) as the Authorization
@@ -120,36 +99,60 @@ func ExtractToken(r *http.Request) (string, error) {
 // malformed tokens, unknown/unspecified signing algorithms, missing secret key,
 // tokens that are not valid yet (i.e., 'nbf' field), tokens that are expired,
 // and tokens that fail signature verification (forged)
-func ValidateToken(uToken string) (*jwt.Token, error) {
+func ValidateToken(uToken string, keys *jose.JSONWebKeySet) (*map[string]interface{}, error) {
 	if len(uToken) == 0 {
 		return nil, fmt.Errorf("Token length is zero")
 	}
 
-	token, err := jwt.Parse(uToken, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", t.Header["alg"])
+	if jws, err := jwt.ParseSigned(uToken); err == nil  {
+		// let's validate using the first signature only
+		if jws.Headers[0].KeyID == "" {
+			return nil, fmt.Errorf("No key id in signature header.")
 		}
-		secret, err := lookupSecret()
-		if err != nil {
+		if key, err := lookupJsonWebKey(jws.Headers[0].KeyID, keys); err == nil {
+			claims := jwt.Claims{}
+			allClaims := new(map[string]interface{})
+			if err := jws.Claims(key, &claims, allClaims ); err == nil {
+				if err := claims.Validate(jwt.Expected{Time:time.Now()}); err == nil {
+					return allClaims, nil
+				} else {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
 			return nil, err
 		}
-		return secret, nil
-	})
-
-	if token.Valid && err == nil {
-		return token, nil
+	} else {
+		return nil, err
 	}
-	// if token not valid, err can be inspected to get more information about which
-	// part failed validation
-	return nil, err
 }
 
-// JWT signing token must be set as environment variable JWT_SECRET and not
-// be the empty string
-func lookupSecret() ([]byte, error) {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return nil, fmt.Errorf("JWT_SECRET not set")
+func lookupJsonWebKey(kid string, keys *jose.JSONWebKeySet ) (*jose.JSONWebKey, error) {
+	for _, key := range keys.Keys {
+		if key.KeyID == kid {
+			return &key, nil
+		}
 	}
-	return []byte(secret), nil
+	return nil, fmt.Errorf("Unable to find a key for id:%s", kid)
+}
+
+func toString(value interface{}) string {
+	switch value.(type) {
+	case string:
+		return value.(string)
+	case int64:
+		return strconv.FormatInt(value.(int64), 10)
+	case bool:
+		return strconv.FormatBool(value.(bool))
+	case int32:
+		return strconv.FormatInt(int64(value.(int32)), 10)
+	case float32:
+		return strconv.FormatFloat(float64(value.(float32)), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(value.(float64), 'f', -1, 64)
+	default:
+		return ""
+	}
 }

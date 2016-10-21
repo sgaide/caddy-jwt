@@ -8,6 +8,7 @@ import (
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"gopkg.in/square/go-jose.v2"
 )
 
 func TestCaddyJwtConfig(t *testing.T) {
@@ -34,12 +35,12 @@ var _ = Describe("JWTAuth Config", func() {
 				shouldErr bool
 				expect    []Rule
 			}{
-				{"jwt /test", false, []Rule{Rule{"/test", nil}}},
-				{"jwt {\npath /test\n}", false, []Rule{Rule{"/test", nil}}},
+				{"jwt /test", false, []Rule{{"/test", nil, jose.JSONWebKeySet{}}}},
+				{"jwt {\npath /test\n}", false, []Rule{{"/test", nil,  jose.JSONWebKeySet{}}}},
 				{`jwt {
 					path /test
 					allow user test
-				}`, false, []Rule{Rule{"/test", []AccessRule{AccessRule{ALLOW, "user", "test"}}}}},
+				}`, false, []Rule{{"/test", []AccessRule{{ALLOW, "user", "test"}}, jose.JSONWebKeySet{}}}},
 				{`jwt /test {
 					allow user test
 				}`, true, nil},
@@ -47,12 +48,12 @@ var _ = Describe("JWTAuth Config", func() {
 					path /test
 					deny role member
 					allow user test
-				}`, false, []Rule{Rule{"/test", []AccessRule{AccessRule{DENY, "role", "member"}, AccessRule{ALLOW, "user", "test"}}}}},
+				}`, false, []Rule{{"/test", []AccessRule{{DENY, "role", "member"}, {ALLOW, "user", "test"}}, jose.JSONWebKeySet{}}}},
 				{`jwt {
 					deny role member
 				}`, true, nil},
 				{`jwt /path1
-				jwt /path2`, false, []Rule{Rule{"/path1", nil}, Rule{"/path2", nil}}},
+				jwt /path2`, false, []Rule{{"/path1", nil, jose.JSONWebKeySet{}}, {"/path2", nil, jose.JSONWebKeySet{}}}},
 				{`jwt {
 					path /path1
 					path /path2
