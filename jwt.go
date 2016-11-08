@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mholt/caddy/caddyhttp/httpserver"
-	"gopkg.in/square/go-jose.v2"
 	"strconv"
-	"gopkg.in/square/go-jose.v2/jwt"
 	"time"
+
+	"github.com/sgaide/caddy/caddyhttp/httpserver"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
@@ -104,7 +105,7 @@ func ValidateToken(uToken string, keys *jose.JSONWebKeySet) (*map[string]interfa
 		return nil, fmt.Errorf("Token length is zero")
 	}
 
-	if jws, err := jwt.ParseSigned(uToken); err == nil  {
+	if jws, err := jwt.ParseSigned(uToken); err == nil {
 		// let's validate using the first signature only
 		if jws.Headers[0].KeyID == "" {
 			return nil, fmt.Errorf("No key id in signature header.")
@@ -112,8 +113,8 @@ func ValidateToken(uToken string, keys *jose.JSONWebKeySet) (*map[string]interfa
 		if key, err := lookupJsonWebKey(jws.Headers[0].KeyID, keys); err == nil {
 			claims := jwt.Claims{}
 			allClaims := new(map[string]interface{})
-			if err := jws.Claims(key, &claims, allClaims ); err == nil {
-				if err := claims.Validate(jwt.Expected{Time:time.Now()}); err == nil {
+			if err := jws.Claims(key, &claims, allClaims); err == nil {
+				if err := claims.Validate(jwt.Expected{Time: time.Now()}); err == nil {
 					return allClaims, nil
 				} else {
 					return nil, err
@@ -129,7 +130,7 @@ func ValidateToken(uToken string, keys *jose.JSONWebKeySet) (*map[string]interfa
 	}
 }
 
-func lookupJsonWebKey(kid string, keys *jose.JSONWebKeySet ) (*jose.JSONWebKey, error) {
+func lookupJsonWebKey(kid string, keys *jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 	for _, key := range keys.Keys {
 		if key.KeyID == kid {
 			return &key, nil

@@ -3,13 +3,14 @@ package jwt
 import (
 	"fmt"
 
-	"github.com/mholt/caddy"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
-	"gopkg.in/square/go-jose.v2"
-	"io"
-	"os"
-	"io/ioutil"
 	"encoding/json"
+	"io"
+	"io/ioutil"
+	"os"
+
+	"github.com/sgaide/caddy"
+	"github.com/sgaide/caddy/caddyhttp/httpserver"
+	"gopkg.in/square/go-jose.v2"
 )
 
 const (
@@ -25,7 +26,7 @@ type JWTAuth struct {
 type Rule struct {
 	Path        string
 	AccessRules []AccessRule
-	Keys	    jose.JSONWebKeySet
+	Keys        jose.JSONWebKeySet
 }
 
 type AccessRule struct {
@@ -42,7 +43,7 @@ func init() {
 }
 
 func Setup(c *caddy.Controller) error {
-	rules,  err := parse(c)
+	rules, err := parse(c)
 	if err != nil {
 		return err
 	}
@@ -72,12 +73,11 @@ func loadKeys(path string, keys *jose.JSONWebKeySet) error {
 		return err
 	}
 	if data, err := ioutil.ReadAll(rdr); err == nil {
-		return json.Unmarshal(data, keys);
+		return json.Unmarshal(data, keys)
 	} else {
 		return err
 	}
 }
-
 
 func parse(c *caddy.Controller) ([]Rule, error) {
 	// This parses the following config blocks
@@ -134,7 +134,7 @@ func parse(c *caddy.Controller) ([]Rule, error) {
 					if len(r.Keys.Keys) != 0 {
 						return nil, c.ArgErr()
 					}
-					loadKeys( c.Val(), &r.Keys)
+					loadKeys(c.Val(), &r.Keys)
 					if c.NextArg() {
 						// we are expecting only one value.
 						return nil, c.ArgErr()

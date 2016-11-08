@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mholt/caddy"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/sgaide/caddy"
+	"github.com/sgaide/caddy/caddyhttp/httpserver"
 	"gopkg.in/square/go-jose.v2"
 )
 
@@ -36,7 +36,7 @@ var _ = Describe("JWTAuth Config", func() {
 				expect    []Rule
 			}{
 				{"jwt /test", false, []Rule{{"/test", nil, jose.JSONWebKeySet{}}}},
-				{"jwt {\npath /test\n}", false, []Rule{{"/test", nil,  jose.JSONWebKeySet{}}}},
+				{"jwt {\npath /test\n}", false, []Rule{{"/test", nil, jose.JSONWebKeySet{}}}},
 				{`jwt {
 					path /test
 					allow user test
