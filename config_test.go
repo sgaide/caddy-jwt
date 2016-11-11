@@ -6,8 +6,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sgaide/caddy"
-	"github.com/sgaide/caddy/caddyhttp/httpserver"
+	"github.com/mholt/caddy"
+	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"gopkg.in/square/go-jose.v2"
 )
 

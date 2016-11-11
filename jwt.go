@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sgaide/caddy/caddyhttp/httpserver"
+	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
