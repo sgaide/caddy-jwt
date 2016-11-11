@@ -1,24 +1,21 @@
-## JWT
+## JWT - Json Web Key Sets based verification
 
 **Authorization Middleware for Caddy**
 
 This middleware implements an authorization layer for [Caddy](https://caddyserver.com) based on JSON Web Tokens (JWT).  You can learn more about using JWT in your application at [jwt.io](https://jwt.io).
+The validation is done using a json web key sets (public keys).
+This plugin has been written to work with jwks provided by the AWS Cognito service, but should work with any jwks.
 
-### Basic Syntax
+### Basic syntax
 
-
-```
-jwt [path]
-```
-
-By default every resource under path will be secured using JWT validation.  To specify a list of resources that need to be secured, use multiple declarations:
+The minimal configuration is a jwt block that contains the protected path and the file path to the key set, a file accessible to the caddy process.
 
 ```
-jwt [path1]
-jwt [path2]
+jwt {
+   path [path]
+   keys [file/path/to/jwkeys_set.json]
+}
 ```
-
-> **Important** You must set the secret used to construct your token in an environment variable named `JWT_SECRET`.  Otherwise, your tokens will always silently fail validation.  Caddy will start without this value set, but it must be present at the time of the request for the signature to be validated.
 
 ### Advanced Syntax
 
@@ -27,6 +24,7 @@ You can optionally use claim information to further control access to your route
 ```
 jwt {
    path [path]
+   keys [file/path/to/jwkeys_set.json]
    allow [claim] [value]
    deny [claim] [value]
 }
@@ -39,6 +37,7 @@ To authorize access based on a claim, use the `allow` syntax.  To deny access, u
 ```
 jwt {
    path /protected
+   keys mykeys.json
    deny role member
    allow user someone
 }
@@ -64,10 +63,9 @@ JWTs consist of three parts: header, claims, and signature.  To properly constru
 ```json
 {
 "typ": "JWT",
-"alg": "HS256|HS384|HS512"
+"alg": "RS256"
 }
 ```
-See progress on https://github.com/BTBurke/caddy-jwt/issues/3 if you're interested in public key signing algorithms.
 
 ##### Claims
 If you want to limit the validity of your tokens to a certain time period, use the "exp" field to declare the expiry time of your token.  This time should be a Unix timestamp in integer format.
