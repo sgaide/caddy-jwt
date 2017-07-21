@@ -20,6 +20,13 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 			continue
 		}
 
+		for _, yesMethod := range p.YesMethods {
+			fmt.Printf("Testing yesMethod %s against %s\n", yesMethod, r.Method)
+			if strings.ToUpper(r.Method) == strings.ToUpper(yesMethod) {
+				return h.Next.ServeHTTP(w, r)
+			}
+		}
+
 		// Path matches, look for unvalidated token
 		uToken, err := ExtractToken(r)
 		if err != nil {
@@ -108,7 +115,7 @@ func ValidateToken(uToken string, keys *jose.JSONWebKeySet) (*map[string]interfa
 	if jws, err := jwt.ParseSigned(uToken); err == nil {
 		// let's validate using the first signature only
 		if jws.Headers[0].KeyID == "" {
-			return nil, fmt.Errorf("No key id in signature header.")
+			return nil, fmt.Errorf("no key id in signature header")
 		}
 		if key, err := lookupJsonWebKey(jws.Headers[0].KeyID, keys); err == nil {
 			claims := jwt.Claims{}
@@ -136,7 +143,7 @@ func lookupJsonWebKey(kid string, keys *jose.JSONWebKeySet) (*jose.JSONWebKey, e
 			return &key, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find a key for id:%s", kid)
+	return nil, fmt.Errorf("unable to find a key for id:%s", kid)
 }
 
 func toString(value interface{}) string {

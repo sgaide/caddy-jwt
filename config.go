@@ -25,6 +25,7 @@ type JWTAuth struct {
 
 type Rule struct {
 	Path        string
+	YesMethods  []string
 	AccessRules []AccessRule
 	Keys        jose.JSONWebKeySet
 }
@@ -113,6 +114,12 @@ func parse(c *caddy.Controller) ([]Rule, error) {
 						// we are expecting only one value.
 						return nil, c.ArgErr()
 					}
+				case "yesMethod":
+					if !c.NextArg() {
+						// we are expecting a value
+						return nil, c.ArgErr()
+					}
+					r.YesMethods = append(r.YesMethods, c.Val())
 				case "allow":
 					args1 := c.RemainingArgs()
 					if len(args1) != 2 {
@@ -143,14 +150,7 @@ func parse(c *caddy.Controller) ([]Rule, error) {
 			}
 			rules = append(rules, r)
 		case 1:
-			rules = append(rules, Rule{Path: args[0]})
-			// one argument passed
-			if c.NextBlock() {
-				// path specified, no block required.
-				return nil, c.ArgErr()
-			}
-		default:
-			// we want only one argument max
+			// we need a block to set keys file
 			return nil, c.ArgErr()
 		}
 	}
