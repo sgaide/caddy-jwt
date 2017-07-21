@@ -21,7 +21,6 @@ func (h JWTAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) 
 		}
 
 		for _, yesMethod := range p.YesMethods {
-			fmt.Printf("Testing yesMethod %s against %s\n", yesMethod, r.Method)
 			if strings.ToUpper(r.Method) == strings.ToUpper(yesMethod) {
 				return h.Next.ServeHTTP(w, r)
 			}
