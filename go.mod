@@ -1,4 +1,4 @@
-module github.com/sgaide/caddy-jwt/v1.0.1
+module github.com/sgaide/caddy-jwt/v3
 
 go 1.13
 
